@@ -1,0 +1,33 @@
+# Entorno virtual
+venv/
+.venv/
+
+# Herramientas binarias (demasiado grandes para git)
+Tesseract-OCR/
+poppler/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+
+# Variables de entorno
+.env
+
+# PDFs de prueba
+*.pdf
+
+# Tesseract binario (demasiado grande para git)
+Tesseract-OCR/
+
+# Streamlit config local
+.streamlit/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db

@@ -1,0 +1,9 @@
+streamlit>=1.30
+google-genai
+requests
+pypdf
+python-dotenv
+lxml
+pytesseract
+Pillow
+pdf2image
