@@ -4,7 +4,6 @@ venv/
 
 # Herramientas binarias (demasiado grandes para git)
 Tesseract-OCR/
-poppler/
 
 # Python
 __pycache__/
