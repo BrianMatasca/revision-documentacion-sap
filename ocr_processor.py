@@ -16,7 +16,17 @@ import os
 
 # ── Rutas a herramientas (relativas al módulo) ──────────────────────
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-POPPLER_PATH = os.path.join(BASE_DIR, "poppler")  # carpeta con pdftoppm.exe
+_POPPLER_LOCAL = os.path.join(BASE_DIR, "poppler")  # binarios Windows (.exe)
+
+# En Windows se usa la carpeta local con los .exe.
+# En Linux/Streamlit Cloud se usa None → pdf2image toma el poppler del PATH
+# (instalado vía packages.txt con poppler-utils).
+import platform as _platform
+POPPLER_PATH: str | None = (
+    _POPPLER_LOCAL
+    if _platform.system() == "Windows" and os.path.isdir(_POPPLER_LOCAL)
+    else None
+)
 
 logger = logging.getLogger(__name__)
 
@@ -51,7 +61,7 @@ def pdf_a_imagenes_bytes(pdf_bytes: bytes, dpi: int = 150) -> list[bytes]:
 
     import io as _io
 
-    poppler_path = POPPLER_PATH if os.path.isdir(POPPLER_PATH) else None
+    poppler_path = POPPLER_PATH  # None en Linux → pdf2image usa el PATH del sistema
     try:
         imagenes = convert_from_bytes(pdf_bytes, dpi=dpi, poppler_path=poppler_path)
     except Exception as e:
