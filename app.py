@@ -304,6 +304,27 @@ def render_sidebar():
         else:
             st.info("Sin MGA cargado", icon="📋")
 
+        # ── Guía de Usuario ──
+        st.divider()
+        st.markdown("#### 📖 Guía de Usuario")
+        try:
+            ruta_guia = BASE_DIR / "guia.pdf"
+            if ruta_guia.exists():
+                with open(ruta_guia, "rb") as f:
+                    pdf_bytes = f.read()
+                st.download_button(
+                    label="📥 Descargar Guía (PDF)",
+                    data=pdf_bytes,
+                    file_name="guia.pdf",
+                    mime="application/pdf",
+                    use_container_width=True,
+                )
+            else:
+                st.caption("⚠️ Archivo guia.pdf no encontrado en el proyecto.")
+        except Exception as e:
+            st.error(f"Error al cargar la guía: {e}")
+
+
 
 # ── Encabezado principal ────────────────────────────────────────────────────
 def render_header():
@@ -383,6 +404,7 @@ def render_carga_documento(tipo: str, nombre: str, icono: str):
                                 "nombre": filename,
                             }
                             st.success(f"✅ Descargado: {filename}")
+                            st.rerun()
                         except SAPAuthError:
                             st.error(
                                 "❌ Credenciales SAP incorrectas. "
@@ -391,23 +413,49 @@ def render_carga_documento(tipo: str, nombre: str, icono: str):
                         except SAPError as e:
                             st.error(f"❌ Error SAP: {e}")
     else:
+        # Inicializar uploader_version para resetear el widget cuando sea necesario
+        if "uploader_version" not in st.session_state:
+            st.session_state["uploader_version"] = {}
+        version = st.session_state["uploader_version"].setdefault(tipo, 0)
+
         up = st.file_uploader(
             f"Subir PDF de {nombre}",
             type=["pdf"],
-            key=f"upload_{tipo}",
+            key=f"upload_{tipo}_{version}",
             label_visibility="collapsed",
         )
         if up is not None:
-            pdf_bytes = up.read()
-            st.session_state["docs_cargados"][tipo] = {
-                "bytes": pdf_bytes,
-                "nombre": up.name,
-            }
+            current_doc = st.session_state["docs_cargados"].get(tipo)
+            if not current_doc or current_doc.get("nombre") != up.name:
+                pdf_bytes = up.read()
+                st.session_state["docs_cargados"][tipo] = {
+                    "bytes": pdf_bytes,
+                    "nombre": up.name,
+                }
+                # Limpiar resultados anteriores para forzar nueva revisión
+                st.session_state["resultados_auto"].pop(tipo, None)
+                st.rerun()
+        else:
+            # Si el uploader está vacío pero hay un documento cargado localmente,
+            # lo quitamos de la memoria porque el usuario lo borró del widget
+            if tipo in st.session_state["docs_cargados"]:
+                st.session_state["docs_cargados"].pop(tipo, None)
+                st.session_state["resultados_auto"].pop(tipo, None)
+                st.rerun()
 
     # Mostrar estado del documento cargado
     doc = st.session_state["docs_cargados"].get(tipo)
     if doc:
-        st.caption(f"📎 {doc['nombre']} · {len(doc['bytes']):,} bytes")
+        col_file, col_clear = st.columns([4, 1])
+        with col_file:
+            st.caption(f"📎 **{doc['nombre']}** · {len(doc['bytes']):,} bytes")
+        with col_clear:
+            if st.button("🗑️ Quitar", key=f"clear_{tipo}", use_container_width=True):
+                st.session_state["docs_cargados"].pop(tipo, None)
+                st.session_state["resultados_auto"].pop(tipo, None)
+                if "uploader_version" in st.session_state and tipo in st.session_state["uploader_version"]:
+                    st.session_state["uploader_version"][tipo] += 1
+                st.rerun()
         return True
     return False
 
