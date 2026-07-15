@@ -14,8 +14,6 @@ __pycache__/
 # Variables de entorno
 .env
 
-# PDFs de prueba
-*.pdf
 
 # Tesseract binario (demasiado grande para git)
 Tesseract-OCR/

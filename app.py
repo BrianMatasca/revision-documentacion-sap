@@ -201,6 +201,8 @@ def init_session_state():
         "resultados_auto": {},
         # Prompts generados para flujo manual: {tipo: str}
         "prompts_manuales": {},
+        # Documento genérico descargado de SAP: {"bytes": bytes, "nombre": str, "url": str}
+        "generic_sap_doc": None,
     }
     for k, v in defaults.items():
         if k not in st.session_state:
@@ -774,6 +776,81 @@ def render_panel_resultados():
 
 
 
+# ── Descargador Genérico SAP ────────────────────────────────────────────────
+def render_descargador_sap():
+    """Renderiza la sección de utilidades para descargar documentos de SAP."""
+    st.markdown("### 📥 Descargador Genérico de SAP")
+    st.caption(
+        "Esta utilidad le permite descargar cualquier documento PDF desde SAP usando las "
+        "credenciales que configuró en el panel lateral."
+    )
+
+    # Verificar credenciales
+    tiene_credenciales = (
+        bool(st.session_state["sap_user"]) and bool(st.session_state["sap_password"])
+    )
+
+    if not tiene_credenciales:
+        st.warning(
+            "Configure sus credenciales SAP en la barra lateral para poder descargar archivos.",
+            icon="🔐",
+        )
+        return
+
+    url_descarga = st.text_input(
+        "URL del documento SAP",
+        key="sap_generic_download_url",
+        placeholder="http://sappro-ci.valledelcauca.gov.co:8000/sap/...",
+    )
+
+    # Si la URL en el input cambia, limpiamos el caché de descarga
+    cached = st.session_state["generic_sap_doc"]
+    if cached and cached.get("url") != url_descarga:
+        st.session_state["generic_sap_doc"] = None
+        cached = None
+
+    if url_descarga:
+        col_btn, _ = st.columns([1, 3])
+        with col_btn:
+            btn_descargar = st.button("⬇️ Descargar archivo", key="btn_download_generic_sap", use_container_width=True)
+
+        if btn_descargar:
+            with st.spinner("Descargando archivo desde SAP..."):
+                try:
+                    pdf_bytes, filename = descargar_documento_sap(
+                        url_descarga,
+                        st.session_state["sap_user"],
+                        st.session_state["sap_password"],
+                    )
+                    st.session_state["generic_sap_doc"] = {
+                        "bytes": pdf_bytes,
+                        "nombre": filename,
+                        "url": url_descarga,
+                    }
+                    st.rerun()
+                except SAPAuthError:
+                    st.error(
+                        "❌ Credenciales SAP incorrectas. "
+                        "Verifique usuario y contraseña en la barra lateral."
+                    )
+                except SAPError as e:
+                    st.error(f"❌ Error al descargar de SAP: {e}")
+
+        # Si el documento ya fue descargado a memoria y la URL coincide, mostrar el botón de guardado
+        cached = st.session_state["generic_sap_doc"]
+        if cached and cached.get("url") == url_descarga:
+            st.markdown("")
+            st.success(f"✅ Documento obtenido: **{cached['nombre']}** ({len(cached['bytes']):,} bytes)")
+            st.download_button(
+                label=f"💾 Guardar {cached['nombre']} en mi computador",
+                data=cached["bytes"],
+                file_name=cached["nombre"],
+                mime="application/pdf",
+                use_container_width=True,
+                key="btn_save_generic_sap",
+            )
+
+
 # ── Pantalla de bloqueo (sin MGA) ──────────────────────────────────────────
 def render_bloqueo():
     """Muestra mensaje de bloqueo cuando no hay MGA cargado."""
@@ -805,27 +882,33 @@ def main():
     render_sidebar()
     render_header()
 
-    if not st.session_state["mga_datos"]:
-        render_bloqueo()
-        return
-
-    # Mostrar datos del proyecto
-    render_project_card()
-
     # Tabs principales
-    tab_auto, tab_manual = st.tabs([
+    tab_auto, tab_manual, tab_sap = st.tabs([
         "🤖 Revisión Automatizada",
         "📝 Revisión Manual Asistida",
+        "📥 Descargador Genérico SAP",
     ])
 
     with tab_auto:
-        render_flujo_automatizado()
+        if not st.session_state["mga_datos"]:
+            render_bloqueo()
+        else:
+            render_project_card()
+            render_flujo_automatizado()
 
     with tab_manual:
-        render_flujo_manual()
+        if not st.session_state["mga_datos"]:
+            render_bloqueo()
+        else:
+            render_project_card()
+            render_flujo_manual()
 
-    # Panel de resultados consolidados
-    render_panel_resultados()
+    with tab_sap:
+        render_descargador_sap()
+
+    # Panel de resultados consolidados (solo si hay MGA y resultados)
+    if st.session_state["mga_datos"] and st.session_state["resultados_auto"]:
+        render_panel_resultados()
 
 
 if __name__ == "__main__":
